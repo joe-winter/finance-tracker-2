@@ -9,6 +9,26 @@ import {
 
 import appCss from "@/styles/app.css?url";
 import { ThemeProvider } from "@/components/theme-provider";
+import { createServerFn } from "@tanstack/react-start";
+import { getWebRequest } from "@tanstack/react-start/server";
+import { getAuth } from "@clerk/tanstack-react-start/server";
+import { DefaultCatchBoundary } from "@/components/default-catch-boundary";
+import { NotFound } from "@/components/not-found";
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserButton,
+} from "@clerk/tanstack-react-start";
+
+const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
+  const { userId } = await getAuth(getWebRequest()!);
+
+  return {
+    userId,
+  };
+});
 
 export const Route = createRootRoute({
   head: () => ({
@@ -31,16 +51,31 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  beforeLoad: async () => {
+    const { userId } = await fetchClerkAuth();
+
+    return { userId };
+  },
+  errorComponent: (props) => {
+    return (
+      <RootDocument>
+        <DefaultCatchBoundary {...props} />
+      </RootDocument>
+    );
+  },
+  notFoundComponent: () => <NotFound />,
   component: RootComponent,
 });
 
 function RootComponent() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <RootDocument>
-        <Outlet />
-      </RootDocument>
-    </ThemeProvider>
+    <ClerkProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <RootDocument>
+          <Outlet />
+        </RootDocument>
+      </ThemeProvider>
+    </ClerkProvider>
   );
 }
 
@@ -51,6 +86,14 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
         <HeadContent />
       </head>
       <body>
+        <div className="ml-auto">
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal" />
+          </SignedOut>
+        </div>
         {children}
         <Scripts />
       </body>
